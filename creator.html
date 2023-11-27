@@ -1,0 +1,399 @@
+<html>
+<head>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script src="logic.js"></script>
+    <style>
+        body {
+            width: fit-content;
+        }
+        #grid {
+            display: flex;
+            flex-direction: column;
+        }
+        .row {
+            display: flex;
+            flex-direction: row;
+        }
+        .cell {
+            height: 150px;
+            width: 150px;
+            border: 1px solid #F0F0F0;
+            display: flex;
+            flex-direction: column;
+            /*justify-content: space-between;*/
+            /*background-color: brown;*/
+        }
+        .cell span {
+            font-size: 20px;
+        }
+
+        span.bottom-left {
+            position: relative;
+            top: 130px
+        }
+
+        input, label {
+            font-size: 20px;
+        }
+
+        #whose-turn {
+            text-align: center;
+            font-size: 34px;
+        }
+        #reset-btn {
+            font-size: 20px;
+        }
+        #score-container {
+            display: flex;
+            justify-content: space-between;
+            font-size: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <br/>
+    <div>
+        <label for="rows"># Rows: </label><input style="margin-left: 5px" id="rows" type="text" style='margin-right: 5px'/><label for="cols"># Cols: </label><input style="margin-left: 5px" id="cols" type="text" style='margin-right: 5px'/><button style="margin-left: 5px" id="reset-btn">Reset / Restart Game</button>
+    </div>
+    <br/>
+    <div>
+        <div id="grid"></div>
+        <br/>
+        <br/>
+        <br/>
+        <div id="whose-turn"></div>
+    </div>
+    </div>
+    <br/>
+    <br/>
+    <br/>
+    <div id="score-container">
+        <div>Hal's Score: <span id="player-1-score">0</span></div>
+        <div>Your Score: <span id="player-2-score">0</span></div>
+    </div>
+    <br/>
+    <br/>
+    <div><label for="next-best">Hal just chose: </label><input style="margin-left: 5px" id="next-best" type="text" style='margin-right: 5px'/></div>
+    <script>
+        const dir = ['top', 'right', 'bottom', 'left']
+        const PLAYER_1 = 1
+        const PLAYER_2 = 2
+        const gridSize = 152
+        let W = 5
+        let H = 3
+        let selectedEdges = {}
+        let selectedLines = new Set()
+        let openLines = new Set()
+        // key == cell index row,col
+        // value == 1 for algo, 2 for other player
+        let gameScores = {}
+        // key = cell index row,col
+        // value = new Set([topLine, rightLine, bottomLine, leftLine])
+        let cellLines = {}
+        let aiSelectedLines = new Set()
+        let whosTurnIsIt = PLAYER_2
+        const resetCellLines = () => {
+            cellLines = {}
+            for(let row = 0; row < H; row++){
+                for(let col = 0; col < W; col++) {
+                    const index = row + ',' + col
+                    if(!cellLines[index]){
+                        cellLines[index] = new Set(createAllLinesFromCell(col, row))
+                    }
+                }
+            }
+        }
+
+        const calculateScore = (playerId, selectedLine) => {
+            const keys = Object.keys(cellLines)
+            let foundKey
+            for(let i = 0; i < keys.length; i++){
+                const key = keys[i]
+                // console.log('cellLines', cellLines[key])
+                // console.log('selectedLine', selectedLine)
+
+                if(cellLines[key].has(selectedLine)){
+                    cellLines[key].delete(selectedLine)
+                }
+
+                if(cellLines[key].size === 0){
+                    foundKey = key
+                }
+            }
+            if(foundKey){
+                gameScores[foundKey] = playerId
+                delete cellLines[foundKey]
+            }
+
+            const playerScores = Object.keys(gameScores).reduce((accum, key) => {
+                // console.log('accum, key', accum, key)
+                if(gameScores[key] === 1){
+                    accum.p1 += 1
+                }else{
+                    accum.p2 += 1
+                }
+
+                return accum
+            }, {p1: 0, p2: 0})
+            $('#player-1-score').text(playerScores.p1)
+            $('#player-2-score').text(playerScores.p2)
+            if(openLines.size === 0){
+                if(playerScores.p1 > playerScores.p2){
+                    alert('Hal Wins!')
+                }else if(playerScores.p1 < playerScores.p2){
+                    alert('You Win!')
+                }else{
+                    alert('Tie Game!')
+                }
+            }
+            if(foundKey){
+                return true
+            }
+            return false
+        }
+
+        const resetOpenLines = () => {
+            for(let row = 0; row < H; row++){
+                for(let col = 0; col < W; col++) {
+                    openLines.add(createLineFromCellIndexAndDir(col, row, dir[0]))
+                    openLines.add(createLineFromCellIndexAndDir(col, row, dir[1]))
+                    openLines.add(createLineFromCellIndexAndDir(col, row, dir[2]))
+                    openLines.add(createLineFromCellIndexAndDir(col, row, dir[3]))
+                }
+            }
+        }
+        resetOpenLines()
+        function createLineFromCellIndexAndDir(col, row, theDir) {
+            switch(theDir) {
+                case dir[0]:
+                    return LetterIndex[row] + NumberIndex[col] + ',' + LetterIndex[row] + NumberIndex[col+1]
+                case dir[1]:
+                    return LetterIndex[row] + NumberIndex[col+1] + ',' + LetterIndex[row+1] + NumberIndex[col+1]
+                case dir[2]:
+                    return LetterIndex[row+1] + NumberIndex[col] + ',' + LetterIndex[row+1] + NumberIndex[col+1]
+                case dir[3]:
+                    return LetterIndex[row] + NumberIndex[col] + ',' + LetterIndex[row+1] + NumberIndex[col]
+            }
+        }
+        function render(){
+            $('#grid').empty()
+            const usedLines = new Set()
+            for(let row = 0; row < H; row++){
+                const rowEL = $('<div>', {class: 'row'})
+                for(let col = 0; col < W; col++){
+                    const id = row + ',' + col
+                    const selected = selectedEdges[id]
+                    const props = {class: 'cell', id: id, css: {}}
+                    if(selected){
+                        selected.forEach((val) => {
+                            if(!usedLines.has(val.line)){
+                                props.css['border-' + val.dir + '-color'] = 'red'
+                                usedLines.add(val.line)
+                            }
+                        })
+
+                    }
+                    if(col === W-1){
+                        props.css['flex-direction'] = 'row'
+                        props.css['justify-content'] = 'space-between'
+                    }
+                    if(gameScores[id]){
+                        props.css['background-color'] = gameScores[id] === 1 ? 'red' : 'blue';
+                    }
+
+                    let cell = $('<div>', props)
+                    if(row === H-1 && col === W-1){
+                        props.css['flex-direction'] = 'column'
+                        props.css['justify-content'] = 'space-between'
+                        cell = $('<div>', props)
+                    }else{
+                        const leftIndex = $('<span>', {css: {'margin-right': -5}}).text(LetterIndex[row] + NumberIndex[col])
+                        cell.append(leftIndex)
+                    }
+                    if(col === W-1 && row !== H-1){
+                        const rightIndex = $('<span>', {css: {'margin-right': -25}}).text(LetterIndex[row] + NumberIndex[col+1])
+                        cell.append(rightIndex)
+                    }
+                    if(row === H-1 && col !== W-1){
+                        const bottomLeft = $('<span>', {class: 'bottom-left', css: {'margin-right': -5}}).text(LetterIndex[row+1] + NumberIndex[col])
+                        cell.append(bottomLeft)
+                    }
+                    if(row === H-1 && col === W-1){
+                        const topContainer = $('<div>', {css: {display: 'flex', 'justify-content': 'space-between'}})
+                        const topLeft = $('<span>', {css: {'margin-right': -5}}).text(LetterIndex[row] + NumberIndex[col])
+                        topContainer.append(topLeft)
+                        const topRight = $('<span>', {css: {'margin-right': -25}}).text(LetterIndex[row] + NumberIndex[col+1])
+                        topContainer.append(topRight)
+                        cell.append(topContainer)
+                        const bottomContainer = $('<div>', {css: {display: 'flex', 'justify-content': 'space-between'}})
+                        const bottomLeft = $('<span>', {class: 'bottom-left', css: {'margin-right': -5, top: 28 }}).text(LetterIndex[row+1] + NumberIndex[col])
+                        bottomContainer.append(bottomLeft)
+                        const bottomRight = $('<span>', {class: 'bottom-left', css: {'margin-right': -22, top: 28}}).text(LetterIndex[row+1] + NumberIndex[col+1])
+                        bottomContainer.append(bottomRight)
+                        cell.append(bottomContainer)
+                    }
+                    rowEL.append(cell)
+                }
+                $('#grid').append(rowEL)
+            }
+            $('#whose-turn').text(whosTurnIsIt === PLAYER_2 ? 'Your Turn' : "Hal's Turn")
+        }
+
+        const processSelection = (col, row, line, dir, playerId) => {
+            const id = row + ',' + col
+            if(!selectedEdges[id]){
+                selectedEdges[id] = []
+            }
+            if(selectedLines.has(line)){
+                selectedLines.delete(line)
+                Object.keys(selectedEdges).forEach((key) => {
+                    selectedEdges[key] = selectedEdges[key].filter((val) => val.line !== line)
+                })
+                openLines.add(line)
+            }else{
+                selectedEdges[id].push({dir: dir, line: line})
+                openLines.delete(line)
+                selectedLines.add(line)
+            }
+            const boxCompleted = calculateScore(playerId, line)
+            if(boxCompleted){
+                whosTurnIsIt = playerId
+            }else{
+                whosTurnIsIt = playerId === PLAYER_1 ? PLAYER_2 : PLAYER_1
+            }
+            if(whosTurnIsIt === PLAYER_1){
+                setTimeout(halsPickSelection, 1000)
+            }
+            render()
+        }
+
+        $('#grid').on('click', function(e){
+            if(whosTurnIsIt !== PLAYER_2) return
+            var posX = e.pageX - $(this).offset().left,
+                posY = e.pageY - $(this).offset().top;
+            const id = e.target.id || e.target.parentElement.id
+            const row = parseInt(id.split(',')[0])
+            const col = parseInt(id.split(',')[1])
+            const leftWall = col * gridSize + 1
+            const rightWall = (col + 1) * gridSize + 1
+            const topWall = row * gridSize + 1
+            const bottomWall = (row + 1) * gridSize + 1
+            let min = {val: Number.MAX_VALUE, dir: dir[0]}
+
+            if(posX - leftWall < min.val){
+                min = {val: posX - leftWall, dir: dir[3]}
+            }
+            if(rightWall - posX < min.val){
+                min = {val: rightWall - posX, dir: dir[1]}
+            }
+            if(posY - topWall < min.val){
+                min = {val: posY - topWall, dir: dir[0]}
+            }
+            if(bottomWall - posY < min.val){
+                min = {val: topWall - posY, dir: dir[2]}
+            }
+            if(!selectedEdges[id]){
+                selectedEdges[id] = []
+            }
+            const line = createLineFromCellIndexAndDir(col, row, min.dir)
+
+            processSelection(col, row, line, min.dir, 2)
+        })
+
+        const convertLineToCellIndexAndDir = (line) => {
+            const points = line.split(',')
+            const point1 = points[0]
+            const point2 = points[1]
+
+            const point1Letter = point1[0]
+            const point1Number = point1.substring(1)
+
+            const point2Letter = point2[0]
+            const point2Number = point2.substring(1)
+
+            const point1LetterIndex = LetterIndex.findIndex((letter) => letter == point1Letter)
+            const point1NumberIndex = NumberIndex.findIndex((number) => number == point1Number)
+
+            const point2LetterIndex = LetterIndex.findIndex((letter) => letter == point2Letter)
+            const point2NumberIndex = NumberIndex.findIndex((number) => number == point2Number)
+
+            const row = point1LetterIndex === H ? point1LetterIndex - 1 : point1LetterIndex
+            const col = point1NumberIndex === W ? point1NumberIndex - 1 : point1NumberIndex
+            let dir = DIR.left
+            if(point1Letter === point2Letter){
+                if(point1LetterIndex === H){
+                    dir = DIR.bottom
+                }else{
+                    dir = DIR.top
+                }
+
+            }
+            if(point1Number === point2Number){
+                if(point2NumberIndex === W){
+                    dir = DIR.right
+                }else{
+                    dir = DIR.left
+                }
+            }
+            return {
+                col, row, dir
+            }
+        }
+        resetCellLines()
+        render()
+        $('#pick-line').on('click', halsPickSelection)
+
+        function halsPickSelection(){
+            let result = {}
+            for(const val of openLines.entries()){
+                result[val[0]] = true
+            }
+            for(const val of selectedLines.entries()){
+                result[val[0]] = false
+            }
+            // result = {"A2,B2":true,"B1,B2":true,"B3,B4":true,"B2,C2":true,"C1,C2":true,"C2,C3":true,"C3,C4":true,"C2,D2":true,"C3,D3":true,"A3,B3":true,"A1,A2":false,"A3,A4":false,"A2,A3":false,"A4,B4":false,"B4,C4":false,"C4,D4":false,"D3,D4":false,"D2,D3":false,"D1,D2":false,"B1,C1":false,"A1,B1":false,"C1,D1":false,"B2,B3":false,"B3,C3":false}
+
+            const nextLine = getLine(result, H, W)
+            $('#next-best').val(nextLine)
+            const data = convertLineToCellIndexAndDir(nextLine)
+            aiSelectedLines.add(nextLine)
+            processSelection(data.col, data.row, nextLine, convertDirToString(data.dir), 1)
+            // console.log('Selected Line: ', nextLine)
+        }
+
+        $('#rows').val(H).on('change', (e) => {
+            const val = parseInt(e.target.value)
+            if(!isNaN(val) && val > 1){
+                H = val
+            }else{
+                alert('Invalid value')
+            }
+        })
+        $('#cols').val(W).on('change', (e) => {
+            const val = parseInt(e.target.value)
+            if(val > 25){
+                alert('Max grid size is 25')
+            } else if(!isNaN(val) && val > 1){
+                W = val
+            }else{
+                alert('Invalid value')
+            }
+        })
+        $('#reset-btn').on('click', resetGame)
+        function resetGame(){
+            selectedEdges = {}
+            selectedLines = new Set()
+            openLines = new Set()
+            gameScores = {}
+            whosTurnIsIt = PLAYER_2
+            resetCellLines()
+            $('#next-best').val('')
+            resetOpenLines()
+            $('#player-1-score').text(0)
+            $('#player-2-score').text(0)
+            render()
+        }
+    </script>
+</body>
+</html>

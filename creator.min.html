@@ -1,0 +1,45 @@
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script><script src="logic.js"></script><style>body {
+            width: fit-content;
+        }
+        #grid {
+            display: flex;
+            flex-direction: column;
+        }
+        .row {
+            display: flex;
+            flex-direction: row;
+        }
+        .cell {
+            height: 150px;
+            width: 150px;
+            border: 1px solid #F0F0F0;
+            display: flex;
+            flex-direction: column;
+            /*justify-content: space-between;*/
+            /*background-color: brown;*/
+        }
+        .cell span {
+            font-size: 20px;
+        }
+
+        span.bottom-left {
+            position: relative;
+            top: 130px
+        }
+
+        input, label {
+            font-size: 20px;
+        }
+
+        #whose-turn {
+            text-align: center;
+            font-size: 34px;
+        }
+        #reset-btn {
+            font-size: 20px;
+        }
+        #score-container {
+            display: flex;
+            justify-content: space-between;
+            font-size: 20px;
+        }</style><br><div><label for="rows"># Rows:</label><input style="margin-left: 5px" id="rows" type="text" style="margin-right: 5px"><label for="cols"># Cols:</label><input style="margin-left: 5px" id="cols" type="text" style="margin-right: 5px"><button style="margin-left: 5px" id="reset-btn">Reset / Restart Game</button></div><br><div><div id="grid"></div><br><br><br><div id="whose-turn"></div></div><br><br><br><div id="score-container"><div>Hal's Score: <span id="player-1-score">0</span></div><div>Your Score: <span id="player-2-score">0</span></div></div><br><br><div><label for="next-best">Hal just chose:</label><input style="margin-left: 5px" id="next-best" type="text" style="margin-right: 5px"></div><script>const dir=["top","right","bottom","left"],PLAYER_1=1,PLAYER_2=2,gridSize=152;let W=5,H=3,selectedEdges={},selectedLines=new Set,openLines=new Set,gameScores={},cellLines={},aiSelectedLines=new Set,whosTurnIsIt=PLAYER_2;const resetCellLines=()=>{cellLines={};for(let t=0;t<H;t++)for(let e=0;e<W;e++){var n=t+","+e;cellLines[n]||(cellLines[n]=new Set(createAllLinesFromCell(e,t)))}},calculateScore=(e,t)=>{var n=Object.keys(cellLines);let r;for(let e=0;e<n.length;e++){var s=n[e];cellLines[s].has(t)&&cellLines[s].delete(t),0===cellLines[s].size&&(r=s)}r&&(gameScores[r]=e,delete cellLines[r]);e=Object.keys(gameScores).reduce((e,t)=>(1===gameScores[t]?e.p1+=1:e.p2+=1,e),{p1:0,p2:0});return $("#player-1-score").text(e.p1),$("#player-2-score").text(e.p2),0===openLines.size&&(e.p1>e.p2?alert("Hal Wins!"):e.p1<e.p2?alert("You Win!"):alert("Tie Game!")),!!r},resetOpenLines=()=>{for(let t=0;t<H;t++)for(let e=0;e<W;e++)openLines.add(createLineFromCellIndexAndDir(e,t,dir[0])),openLines.add(createLineFromCellIndexAndDir(e,t,dir[1])),openLines.add(createLineFromCellIndexAndDir(e,t,dir[2])),openLines.add(createLineFromCellIndexAndDir(e,t,dir[3]))};function createLineFromCellIndexAndDir(e,t,n){switch(n){case dir[0]:return LetterIndex[t]+NumberIndex[e]+","+LetterIndex[t]+NumberIndex[e+1];case dir[1]:return LetterIndex[t]+NumberIndex[e+1]+","+LetterIndex[t+1]+NumberIndex[e+1];case dir[2]:return LetterIndex[t+1]+NumberIndex[e]+","+LetterIndex[t+1]+NumberIndex[e+1];case dir[3]:return LetterIndex[t]+NumberIndex[e]+","+LetterIndex[t+1]+NumberIndex[e]}}function render(){$("#grid").empty();const r=new Set;for(let n=0;n<H;n++){var s=$("<div>",{class:"row"});for(let t=0;t<W;t++){var i=n+","+t,d=selectedEdges[i];const l={class:"cell",id:i,css:{}};d&&d.forEach(e=>{r.has(e.line)||(l.css["border-"+e.dir+"-color"]="red",r.add(e.line))}),t===W-1&&(l.css["flex-direction"]="row",l.css["justify-content"]="space-between"),gameScores[i]&&(l.css["background-color"]=1===gameScores[i]?"red":"blue");let e=$("<div>",l);n===H-1&&t===W-1?(l.css["flex-direction"]="column",l.css["justify-content"]="space-between",e=$("<div>",l)):(d=$("<span>",{css:{"margin-right":-5}}).text(LetterIndex[n]+NumberIndex[t]),e.append(d)),t===W-1&&n!==H-1&&(i=$("<span>",{css:{"margin-right":-25}}).text(LetterIndex[n]+NumberIndex[t+1]),e.append(i)),n===H-1&&t!==W-1&&(d=$("<span>",{class:"bottom-left",css:{"margin-right":-5}}).text(LetterIndex[n+1]+NumberIndex[t]),e.append(d)),n===H-1&&t===W-1&&(i=$("<div>",{css:{display:"flex","justify-content":"space-between"}}),d=$("<span>",{css:{"margin-right":-5}}).text(LetterIndex[n]+NumberIndex[t]),i.append(d),d=$("<span>",{css:{"margin-right":-25}}).text(LetterIndex[n]+NumberIndex[t+1]),i.append(d),e.append(i),d=$("<div>",{css:{display:"flex","justify-content":"space-between"}}),i=$("<span>",{class:"bottom-left",css:{"margin-right":-5,top:28}}).text(LetterIndex[n+1]+NumberIndex[t]),d.append(i),i=$("<span>",{class:"bottom-left",css:{"margin-right":-22,top:28}}).text(LetterIndex[n+1]+NumberIndex[t+1]),d.append(i),e.append(d)),s.append(e)}$("#grid").append(s)}$("#whose-turn").text(whosTurnIsIt===PLAYER_2?"Your Turn":"Hal's Turn")}resetOpenLines();const processSelection=(e,t,n,r,s)=>{t=t+","+e,selectedEdges[t]||(selectedEdges[t]=[]),(selectedLines.has(n)?(selectedLines.delete(n),Object.keys(selectedEdges).forEach(e=>{selectedEdges[e]=selectedEdges[e].filter(e=>e.line!==n)}),openLines):(selectedEdges[t].push({dir:r,line:n}),openLines.delete(n),selectedLines)).add(n),e=calculateScore(s,n);(whosTurnIsIt=e?s:s===PLAYER_1?PLAYER_2:PLAYER_1)===PLAYER_1&&setTimeout(halsPickSelection,1e3),render()},convertLineToCellIndexAndDir=($("#grid").on("click",function(t){if(whosTurnIsIt===PLAYER_2){var n=t.pageX-$(this).offset().left,r=t.pageY-$(this).offset().top,t=t.target.id||t.target.parentElement.id,s=parseInt(t.split(",")[0]),i=parseInt(t.split(",")[1]),d=i*gridSize+1,l=(i+1)*gridSize+1,c=s*gridSize+1,a=(s+1)*gridSize+1;let e={val:Number.MAX_VALUE,dir:dir[0]};a-r<(e=r-c<(e=l-n<(e=n-d<e.val?{val:n-d,dir:dir[3]}:e).val?{val:l-n,dir:dir[1]}:e).val?{val:r-c,dir:dir[0]}:e).val&&(e={val:c-r,dir:dir[2]}),selectedEdges[t]||(selectedEdges[t]=[]);a=createLineFromCellIndexAndDir(i,s,e.dir);processSelection(i,s,a,e.dir,2)}}),e=>{var e=e.split(","),t=e[0],e=e[1];const n=t[0],r=t.substring(1),s=e[0],i=e.substring(1);var t=LetterIndex.findIndex(e=>e==n),e=NumberIndex.findIndex(e=>e==r),d=(LetterIndex.findIndex(e=>e==s),NumberIndex.findIndex(e=>e==i)),l=t===H?t-1:t,e=e===W?e-1:e;let c=DIR.left;return n===s&&(c=t===H?DIR.bottom:DIR.top),{col:e,row:l,dir:c=r===i?d===W?DIR.right:DIR.left:c}});function halsPickSelection(){var e={};for(const r of openLines.entries())e[r[0]]=!0;for(const s of selectedLines.entries())e[s[0]]=!1;var t=getLine(e,H,W),n=($("#next-best").val(t),convertLineToCellIndexAndDir(t));aiSelectedLines.add(t),processSelection(n.col,n.row,t,convertDirToString(n.dir),1)}function resetGame(){selectedEdges={},selectedLines=new Set,openLines=new Set,gameScores={},whosTurnIsIt=PLAYER_2,resetCellLines(),$("#next-best").val(""),resetOpenLines(),$("#player-1-score").text(0),$("#player-2-score").text(0),render()}resetCellLines(),render(),$("#pick-line").on("click",halsPickSelection),$("#rows").val(H).on("change",e=>{e=parseInt(e.target.value);!isNaN(e)&&1<e?H=e:alert("Invalid value")}),$("#cols").val(W).on("change",e=>{e=parseInt(e.target.value);25<e?alert("Max grid size is 25"):!isNaN(e)&&1<e?W=e:alert("Invalid value")}),$("#reset-btn").on("click",resetGame)</script>
